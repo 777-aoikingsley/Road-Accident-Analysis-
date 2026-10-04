@@ -14,7 +14,19 @@ h1, h2, h3 { color: #FFFFFF !important; }
 """, unsafe_allow_html=True)
 
 st.title("🚦 Road Accident Data Analysis")
-st.caption("SQLite · Pandas · Streamlit · Plotly 3D | Mumbai University VAP")
+st.markdown("""
+<div style='background: linear-gradient(135deg, #0a2540 0%, #081B2A 100%); 
+            padding: 30px; border-radius: 15px; margin-bottom: 20px; 
+            border-left: 4px solid #00d4ff;'>
+    <h1 style='color: white; margin: 0; font-size: 2.2em;'>🚦 Road Accident Analytics</h1>
+    <p style='color: #8899aa; margin: 8px 0 0 0; font-size: 1.1em;'>
+        Interactive dashboard for accident patterns, hotspots, and trends. 
+    </p>
+    <p style='color: #00d4ff; margin: 12px 0 0 0; font-size: 0.9em;'>
+        ⚡ Live · SQLite Backend · 5,000 records · WebGL 3D
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 @st.cache_data
 def q(sql, params=()):
@@ -24,7 +36,15 @@ def q(sql, params=()):
     return df
 
 with st.sidebar:
-    st.header("🔍 Filters")
+    st.markdown("""
+<div style='text-align: center; padding: 10px 0;'>
+    <div style='font-size: 2.5em;'>🚦</div>
+    <div style='color: #00d4ff; font-weight: bold; font-size: 1.1em;'>ROAD SAFETY</div>
+    <div style='color: #8899aa; font-size: 0.8em;'>Analytics Dashboard v2.0</div>
+</div>
+<hr style='border-color: #102D40;'>
+<h3 style='color: white;'>🔍 Filters</h3>
+""", unsafe_allow_html=True)
     years = q("SELECT DISTINCT substr(date,1,4) y FROM accidents ORDER BY y")['y'].tolist()
     year = st.select_slider("Year", options=years, value=years[-1])
     sev = st.multiselect("Severity", ['Fatal','Serious','Minor'], default=['Fatal','Serious','Minor'])
@@ -42,6 +62,8 @@ c1, c2, c3 = st.columns(3)
 c1.metric("Total Accidents", f"{total:,}")
 c2.metric("Fatal Crashes", f"{fatal:,}")
 c3.metric("States Covered", nloc)
+
+st.info("💡 **How to use:** Filter by year/severity/state in the sidebar → explore tabs below → run custom SQL queries in the last tab.")
 
 st.divider()
 
@@ -128,5 +150,31 @@ with tab4:
         except Exception as e:
             st.error(f"SQLite Error: {e}")
 
-st.divider()
-st.caption("**Architecture:** 3-tier — SQLite (Data) → Pandas + sqlite3 (Processing) → Streamlit + Plotly (Presentation)")
+st.markdown("""
+<div style='background: #0a1a2a; padding: 20px; border-radius: 12px; 
+            margin-top: 30px; border-top: 3px solid #00d4ff;'>
+    <h4 style='color: #00d4ff; margin: 0 0 10px 0;'>⚙️ System Architecture — 3-Tier</h4>
+    <div style='display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; color: #ccd6e0;'>
+        <div>
+            <strong style='color: white;'>📊 Data Layer</strong><br>
+            SQLite accidents.db<br>
+            4 tables · WAL mode · B-tree indexes
+        </div>
+        <div>
+            <strong style='color: white;'>⚙️ Processing Layer</strong><br>
+            Pandas ETL pipeline<br>
+            sqlite3 query engine
+        </div>
+        <div>
+            <strong style='color: white;'>🎨 Presentation Layer</strong><br>
+            Streamlit UI · Plotly WebGL<br>
+            Reactive filtering
+        </div>
+    </div>
+    <hr style='border-color: #102D40; margin: 15px 0;'>
+    <div style='color: #667788; font-size: 0.85em; text-align: center;'>
+        THROUGH ACCIDENT ANALYSIS USING PYTHON. <br>
+        <span style='color: #00d4ff;'>Python 3.x · SQLite · Pandas · Streamlit · Plotly 3D</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
