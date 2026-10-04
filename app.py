@@ -106,6 +106,55 @@ st.markdown(
         border: 1px solid var(--line) !important;
         border-radius: 12px !important;
     }
+
+    .stat-card {
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 14px;
+        padding: 1.2rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: #CBD5E1;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.4rem;
+    }
+
+    .stat-value {
+        font-size: 1.8rem;
+        color: #F8FAFC;
+        font-weight: 800;
+    }
+
+    .stat-desc {
+        font-size: 0.75rem;
+        color: #94A3B8;
+        margin-top: 0.4rem;
+    }
+
+    .insight-box {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+        border-left: 3px solid #6366F1;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .insight-title {
+        font-weight: 700;
+        color: #F8FAFC;
+        font-size: 0.95rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .insight-text {
+        font-size: 0.85rem;
+        color: #CBD5E1;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -156,7 +205,7 @@ with st.sidebar:
     st.divider()
     st.caption(f"✓ Database ready: {status}")
 
-# ---- Top Header (no duplicate KPIs here) ---------------------------------------------------------------
+# ---- Top Header ---------------------------------------------------------------
 st.title("🚦 Road Accident Analytics")
 st.caption("Interactive insights for patterns, hotspots, and severity trends")
 
@@ -172,241 +221,269 @@ st.divider()
 
 # ---- OVERVIEW PAGE ---------------------------------------------------------------
 if nav == "Overview":
-    # KPIs only show here
-    metric_df = run_sql(
-        """
+    # Build filtered data for insights
+    where, params = build_where(year, severities, state)
+    
+    insight_data = run_sql(
+        f"""
         SELECT
             COUNT(*) AS total,
             SUM(CASE WHEN severity='Fatal' THEN 1 ELSE 0 END) AS fatal,
+            SUM(CASE WHEN severity='Serious' THEN 1 ELSE 0 END) AS serious,
+            SUM(CASE WHEN severity='Minor' THEN 1 ELSE 0 END) AS minor,
             COALESCE(SUM(num_fatalities), 0) AS deaths,
-            (SELECT COUNT(DISTINCT state) FROM locations) AS states
-        FROM accidents
-        """
-    )
-
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        st.metric(
-            "Total Accidents", f"{int(metric_df['total'].iloc[0]):,}"
-        )
-    with k2:
-        st.metric(
-            "Fatal Crashes", f"{int(metric_df['fatal'].iloc[0]):,}"
-        )
-    with k3:
-        st.metric(
-            "Total Deaths", f"{int(metric_df['deaths'].iloc[0]):,}"
-        )
-    with k4:
-        st.metric(
-            "States Covered", f"{int(metric_df['states'].iloc[0]):,}"
-        )
-
-    st.divider()
-
-    # Severity breakdown
-    where, params = build_where(year, severities, state)
-    sev_data = run_sql(
-        f"""
-        SELECT a.severity, COUNT(*) AS count, SUM(a.num_fatalities) AS deaths
+            ROUND(COALESCE(AVG(num_injuries), 0), 1) AS avg_injuries
         FROM accidents a
         JOIN locations l ON a.location_id = l.location_id
         WHERE {where}
-        GROUP BY a.severity
-        ORDER BY count DESC
         """,
         tuple(params),
     )
 
-    col_a, col_b = st.columns([1.5, 1])
+    if insight_data.empty or insight_data['total'].iloc[0] == 0:
+        st.warning("No data available for the selected filters.")
+    else:
+        # Key insights header
+        st.subheader("Key Insights")
+        
+        insights_col1, insights_col2, insights_col3 = st.columns(3)
+        
+        with insights_col1:
+            st.markdown(f"""
+            <div class="insight-box">
+                <div class="insight-title">Incidents in Period</div>
+                <div class="stat-value">{int(insight_data['total'].iloc[0]):,}</div>
+                <div class="insight-text">Across selected filters</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with insights_col2:
+            fatal_count = int(insight_data['fatal'].iloc[0])
+            total_count = int(insight_data['total'].iloc[0])
+            fatal_pct = (fatal_count / total_count * 100) if total_count > 0 else 0
+            st.markdown(f"""
+            <div class="insight-box">
+                <div class="insight-title">Fatal Incidents</div>
+                <div class="stat-value">{fatal_count}</div>
+                <div class="insight-text">{fatal_pct:.1f}% of total</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with insights_col3:
+            st.markdown(f"""
+            <div class="insight-box">
+                <div class="insight-title">Total Deaths</div>
+                <div class="stat-value">{int(insight_data['deaths'].iloc[0])}</div>
+                <div class="insight-text">Lives impacted</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    with col_a:
-        st.subheader("Severity Distribution")
-        if sev_data.empty:
-            st.info("No data for selected filters.")
-        else:
-            fig = px.bar(
-                sev_data,
-                x="severity",
-                y="count",
-                color="severity",
-                color_discrete_map={
-                    "Fatal": "#ef4444",
-                    "Serious": "#f59e0b",
-                    "Minor": "#10b981",
-                },
-                text="count",
-            )
-            fig.update_layout(
-                paper_bgcolor="#0B0F19",
-                plot_bgcolor="#0B0F19",
-                font_color="#F8FAFC",
-                showlegend=False,
-                xaxis_title="",
-                yaxis_title="",
-                margin=dict(l=20, r=20, t=20, b=20),
-                height=350,
-            )
-            fig.update_xaxes(showgrid=False)
-            fig.update_yaxes(showgrid=True, gridcolor="rgba(148,163,184,0.08)")
-            st.plotly_chart(fig, use_container_width=True)
+        st.divider()
 
-    with col_b:
-        st.subheader("Summary")
-        if sev_data.empty:
-            st.caption("No data available.")
-        else:
-            for _, row in sev_data.iterrows():
-                color_map = {
-                    "Fatal": "🔴",
-                    "Serious": "🟠",
-                    "Minor": "🟢",
-                }
-                st.metric(
-                    f"{color_map.get(row['severity'], '')} {row['severity']}",
-                    f"{row['count']}",
-                    f"Deaths: {row['deaths']}",
+        # Severity breakdown
+        sev_data = run_sql(
+            f"""
+            SELECT a.severity, COUNT(*) AS count, SUM(a.num_fatalities) AS deaths
+            FROM accidents a
+            JOIN locations l ON a.location_id = l.location_id
+            WHERE {where}
+            GROUP BY a.severity
+            ORDER BY count DESC
+            """,
+            tuple(params),
+        )
+
+        col_a, col_b = st.columns([1.5, 1])
+
+        with col_a:
+            st.subheader("Severity Distribution")
+            if sev_data.empty:
+                st.info("No data for selected filters.")
+            else:
+                fig = px.bar(
+                    sev_data,
+                    x="severity",
+                    y="count",
+                    color="severity",
+                    color_discrete_map={
+                        "Fatal": "#ef4444",
+                        "Serious": "#f59e0b",
+                        "Minor": "#10b981",
+                    },
+                    text="count",
                 )
+                fig.update_layout(
+                    paper_bgcolor="#0B0F19",
+                    plot_bgcolor="#0B0F19",
+                    font_color="#F8FAFC",
+                    showlegend=False,
+                    xaxis_title="",
+                    yaxis_title="",
+                    margin=dict(l=20, r=20, t=20, b=20),
+                    height=350,
+                )
+                fig.update_xaxes(showgrid=False)
+                fig.update_yaxes(showgrid=True, gridcolor="rgba(148,163,184,0.08)")
+                st.plotly_chart(fig, use_container_width=True)
 
-    st.divider()
+        with col_b:
+            st.subheader("Breakdown")
+            if sev_data.empty:
+                st.caption("No data available.")
+            else:
+                for _, row in sev_data.iterrows():
+                    color_map = {
+                        "Fatal": "🔴",
+                        "Serious": "🟠",
+                        "Minor": "🟢",
+                    }
+                    st.markdown(f"""
+                    <div class="stat-card">
+                        <div class="stat-label">{color_map.get(row['severity'], '')} {row['severity']}</div>
+                        <div class="stat-value">{row['count']}</div>
+                        <div class="stat-desc">Deaths: {row['deaths']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-    # 3D, Heatmap, Geo tabs
-    tab1, tab2, tab3 = st.tabs(["3D Scatter", "Heatmap", "Geographic Map"])
+        st.divider()
 
-    with tab1:
-        st.subheader("3D Animated Accident Distribution")
-        df = run_sql(
-            f"""
-            SELECT a.date, a.severity, a.num_fatalities, a.num_injuries, a.light_condition,
-                   l.latitude, l.longitude, l.state, substr(a.date,1,7) AS month
-            FROM accidents a
-            JOIN locations l ON a.location_id = l.location_id
-            WHERE {where}
-            """,
-            tuple(params),
-        )
-        if df.empty:
-            st.warning("No data for this filter set.")
-        else:
-            df["size"] = df["num_injuries"] + 1
-            fig = px.scatter_3d(
-                df,
-                x="longitude",
-                y="latitude",
-                z="num_fatalities",
-                color="severity",
-                size="size",
-                animation_frame="month",
-                color_discrete_map={
-                    "Fatal": "#ef4444",
-                    "Serious": "#f59e0b",
-                    "Minor": "#10b981",
-                },
-                hover_data=["date", "state", "light_condition"],
-                opacity=0.7,
-                height=600,
-            )
-            fig.update_layout(
-                scene=dict(
-                    xaxis_title="Longitude",
-                    yaxis_title="Latitude",
-                    zaxis_title="Fatalities",
-                    bgcolor="#0B0F19",
-                    xaxis=dict(gridcolor="rgba(148,163,184,0.08)"),
-                    yaxis=dict(gridcolor="rgba(148,163,184,0.08)"),
-                    zaxis=dict(gridcolor="rgba(148,163,184,0.08)"),
-                ),
-                paper_bgcolor="#0B0F19",
-                font_color="#F8FAFC",
-                margin=dict(l=0, r=0, t=0, b=0),
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        # 3D, Heatmap, Geo tabs
+        tab1, tab2, tab3 = st.tabs(["3D Scatter", "Heatmap", "Geographic Map"])
 
-    with tab2:
-        st.subheader("Hour × Day-of-Week Density Heatmap")
-        heat = run_sql(
-            f"""
-            SELECT a.time, a.date
-            FROM accidents a
-            JOIN locations l ON a.location_id = l.location_id
-            WHERE {where}
-            """,
-            tuple(params),
-        )
-        if heat.empty:
-            st.warning("No data for this filter set.")
-        else:
-            heat["hour"] = heat["time"].str[:2].astype(int)
-            heat["dow"] = pd.to_datetime(heat["date"]).dt.day_name()
-            order = [
-                "Monday",
-                "Tuesday",
-                "Wednesday",
-                "Thursday",
-                "Friday",
-                "Saturday",
-                "Sunday",
-            ]
-            pivot = heat.groupby(["dow", "hour"]).size().unstack(fill_value=0)
-            pivot = pivot.reindex([d for d in order if d in pivot.index])
-            fig = px.imshow(
-                pivot,
-                aspect="auto",
-                color_continuous_scale="Inferno",
-                labels=dict(x="Hour of Day", y="Day of Week", color="Accidents"),
-                height=500,
+        with tab1:
+            st.subheader("3D Animated Accident Distribution")
+            df = run_sql(
+                f"""
+                SELECT a.date, a.severity, a.num_fatalities, a.num_injuries, a.light_condition,
+                       l.latitude, l.longitude, l.state, substr(a.date,1,7) AS month
+                FROM accidents a
+                JOIN locations l ON a.location_id = l.location_id
+                WHERE {where}
+                """,
+                tuple(params),
             )
-            fig.update_layout(
-                paper_bgcolor="#0B0F19",
-                plot_bgcolor="#0B0F19",
-                font_color="#F8FAFC",
-                margin=dict(l=20, r=20, t=20, b=20),
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            if df.empty:
+                st.warning("No data for this filter set.")
+            else:
+                df["size"] = df["num_injuries"] + 1
+                fig = px.scatter_3d(
+                    df,
+                    x="longitude",
+                    y="latitude",
+                    z="num_fatalities",
+                    color="severity",
+                    size="size",
+                    animation_frame="month",
+                    color_discrete_map={
+                        "Fatal": "#ef4444",
+                        "Serious": "#f59e0b",
+                        "Minor": "#10b981",
+                    },
+                    hover_data=["date", "state", "light_condition"],
+                    opacity=0.7,
+                    height=600,
+                )
+                fig.update_layout(
+                    scene=dict(
+                        xaxis_title="Longitude",
+                        yaxis_title="Latitude",
+                        zaxis_title="Fatalities",
+                        bgcolor="#0B0F19",
+                        xaxis=dict(gridcolor="rgba(148,163,184,0.08)"),
+                        yaxis=dict(gridcolor="rgba(148,163,184,0.08)"),
+                        zaxis=dict(gridcolor="rgba(148,163,184,0.08)"),
+                    ),
+                    paper_bgcolor="#0B0F19",
+                    font_color="#F8FAFC",
+                    margin=dict(l=0, r=0, t=0, b=0),
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
-    with tab3:
-        st.subheader("Geographic Hotspot Map")
-        geo = run_sql(
-            f"""
-            SELECT l.latitude, l.longitude, a.severity, a.num_fatalities, l.state
-            FROM accidents a
-            JOIN locations l ON a.location_id = l.location_id
-            WHERE {where}
-            """,
-            tuple(params),
-        )
-        if geo.empty:
-            st.warning("No data for this filter set.")
-        else:
-            fig = px.scatter(
-                geo,
-                x="longitude",
-                y="latitude",
-                color="severity",
-                size="num_fatalities",
-                size_max=22,
-                hover_data=["state"],
-                color_discrete_map={
-                    "Fatal": "#ef4444",
-                    "Serious": "#f59e0b",
-                    "Minor": "#10b981",
-                },
-                height=600,
+        with tab2:
+            st.subheader("Hour × Day-of-Week Density Heatmap")
+            heat = run_sql(
+                f"""
+                SELECT a.time, a.date
+                FROM accidents a
+                JOIN locations l ON a.location_id = l.location_id
+                WHERE {where}
+                """,
+                tuple(params),
             )
-            fig.update_layout(
-                paper_bgcolor="#0B0F19",
-                plot_bgcolor="#0B0F19",
-                font_color="#F8FAFC",
-                xaxis=dict(
-                    title="Longitude", gridcolor="rgba(148,163,184,0.08)"
-                ),
-                yaxis=dict(
-                    title="Latitude", gridcolor="rgba(148,163,184,0.08)"
-                ),
-                legend_title_text="Severity",
-                margin=dict(l=20, r=20, t=20, b=20),
+            if heat.empty:
+                st.warning("No data for this filter set.")
+            else:
+                heat["hour"] = heat["time"].str[:2].astype(int)
+                heat["dow"] = pd.to_datetime(heat["date"]).dt.day_name()
+                order = [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                ]
+                pivot = heat.groupby(["dow", "hour"]).size().unstack(fill_value=0)
+                pivot = pivot.reindex([d for d in order if d in pivot.index])
+                fig = px.imshow(
+                    pivot,
+                    aspect="auto",
+                    color_continuous_scale="Inferno",
+                    labels=dict(x="Hour of Day", y="Day of Week", color="Accidents"),
+                    height=500,
+                )
+                fig.update_layout(
+                    paper_bgcolor="#0B0F19",
+                    plot_bgcolor="#0B0F19",
+                    font_color="#F8FAFC",
+                    margin=dict(l=20, r=20, t=20, b=20),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+        with tab3:
+            st.subheader("Geographic Hotspot Map")
+            geo = run_sql(
+                f"""
+                SELECT l.latitude, l.longitude, a.severity, a.num_fatalities, l.state
+                FROM accidents a
+                JOIN locations l ON a.location_id = l.location_id
+                WHERE {where}
+                """,
+                tuple(params),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            if geo.empty:
+                st.warning("No data for this filter set.")
+            else:
+                fig = px.scatter(
+                    geo,
+                    x="longitude",
+                    y="latitude",
+                    color="severity",
+                    size="num_fatalities",
+                    size_max=22,
+                    hover_data=["state"],
+                    color_discrete_map={
+                        "Fatal": "#ef4444",
+                        "Serious": "#f59e0b",
+                        "Minor": "#10b981",
+                    },
+                    height=600,
+                )
+                fig.update_layout(
+                    paper_bgcolor="#0B0F19",
+                    plot_bgcolor="#0B0F19",
+                    font_color="#F8FAFC",
+                    xaxis=dict(
+                        title="Longitude", gridcolor="rgba(148,163,184,0.08)"
+                    ),
+                    yaxis=dict(
+                        title="Latitude", gridcolor="rgba(148,163,184,0.08)"
+                    ),
+                    legend_title_text="Severity",
+                    margin=dict(l=20, r=20, t=20, b=20),
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
 # ---- ANALYTICS PAGE ---------------------------------------------------------------
 elif nav == "Analytics":
