@@ -110,13 +110,12 @@ with tab3:
         WHERE {where}
     """, tuple(params))
     if not df.empty:
-        fig = px.scatter_mapbox(
-            df,
-            lat='latitude', lon='longitude', color='severity',
+        fig = px.scatter_map(df, lat='latitude', lon='longitude', color='severity',
             size='num_fatalities', size_max=18,
             color_discrete_map={'Fatal':'red','Serious':'orange','Minor':'green'},
-            zoom=4, height=600, mapbox_style='carto-darkmatter'
-        )
+            zoom=4, height=600)
+        fig.update_layout(map_style="carto-darkmatter",
+            paper_bgcolor='rgb(10,15,25)', font_color='white')
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No data available for selected filters")
