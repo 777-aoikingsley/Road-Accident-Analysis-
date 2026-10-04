@@ -187,23 +187,16 @@ with st.sidebar:
     st.caption("Analysis Suite")
     st.divider()
 
-    years = run_sql("SELECT DISTINCT substr(date,1,4) y FROM accidents ORDER BY y DESC")[
-        "y"
-    ].tolist()
+    years = run_sql("SELECT DISTINCT substr(date,1,4) y FROM accidents ORDER BY y DESC")["y"].tolist()
     year = st.select_slider("Year", options=years, value=years[0] if years else 2024)
 
     severity_opts = ["Fatal", "Serious", "Minor"]
-    severities = st.multiselect(
-        "Severity", severity_opts, default=severity_opts
-    )
+    severities = st.multiselect("Severity", severity_opts, default=severity_opts)
 
-    states = run_sql("SELECT DISTINCT state FROM locations ORDER BY state")[
-        "state"
-    ].tolist()
+    states = run_sql("SELECT DISTINCT state FROM locations ORDER BY state")["state"].tolist()
     state = st.selectbox("State", ["All"] + states)
 
     st.divider()
-    st.caption(f"✓ Database ready: {status}")
 
 # ---- Top Header ---------------------------------------------------------------
 st.title("🚦 Road Accident Analytics")
@@ -221,16 +214,13 @@ st.divider()
 
 # ---- OVERVIEW PAGE ---------------------------------------------------------------
 if nav == "Overview":
-    # Build filtered data for insights
     where, params = build_where(year, severities, state)
-    
+
     insight_data = run_sql(
         f"""
         SELECT
             COUNT(*) AS total,
             SUM(CASE WHEN severity='Fatal' THEN 1 ELSE 0 END) AS fatal,
-            SUM(CASE WHEN severity='Serious' THEN 1 ELSE 0 END) AS serious,
-            SUM(CASE WHEN severity='Minor' THEN 1 ELSE 0 END) AS minor,
             COALESCE(SUM(num_fatalities), 0) AS deaths,
             ROUND(COALESCE(AVG(num_injuries), 0), 1) AS avg_injuries
         FROM accidents a
@@ -243,11 +233,10 @@ if nav == "Overview":
     if insight_data.empty or insight_data['total'].iloc[0] == 0:
         st.warning("No data available for the selected filters.")
     else:
-        # Key insights header
         st.subheader("Key Insights")
-        
+
         insights_col1, insights_col2, insights_col3 = st.columns(3)
-        
+
         with insights_col1:
             st.markdown(f"""
             <div class="insight-box">
@@ -256,7 +245,7 @@ if nav == "Overview":
                 <div class="insight-text">Across selected filters</div>
             </div>
             """, unsafe_allow_html=True)
-        
+
         with insights_col2:
             fatal_count = int(insight_data['fatal'].iloc[0])
             total_count = int(insight_data['total'].iloc[0])
@@ -265,10 +254,10 @@ if nav == "Overview":
             <div class="insight-box">
                 <div class="insight-title">Fatal Incidents</div>
                 <div class="stat-value">{fatal_count}</div>
-                <div class="insight-text">{fatal_pct:.1f}% of total</div>
+                <div class="insight-text">{fatal_pct:.1f}% of the selected period</div>
             </div>
             """, unsafe_allow_html=True)
-        
+
         with insights_col3:
             st.markdown(f"""
             <div class="insight-box">
@@ -280,7 +269,6 @@ if nav == "Overview":
 
         st.divider()
 
-        # Severity breakdown
         sev_data = run_sql(
             f"""
             SELECT a.severity, COUNT(*) AS count, SUM(a.num_fatalities) AS deaths
@@ -347,7 +335,6 @@ if nav == "Overview":
 
         st.divider()
 
-        # 3D, Heatmap, Geo tabs
         tab1, tab2, tab3 = st.tabs(["3D Scatter", "Heatmap", "Geographic Map"])
 
         with tab1:
@@ -474,12 +461,8 @@ if nav == "Overview":
                     paper_bgcolor="#0B0F19",
                     plot_bgcolor="#0B0F19",
                     font_color="#F8FAFC",
-                    xaxis=dict(
-                        title="Longitude", gridcolor="rgba(148,163,184,0.08)"
-                    ),
-                    yaxis=dict(
-                        title="Latitude", gridcolor="rgba(148,163,184,0.08)"
-                    ),
+                    xaxis=dict(title="Longitude", gridcolor="rgba(148,163,184,0.08)"),
+                    yaxis=dict(title="Latitude", gridcolor="rgba(148,163,184,0.08)"),
                     legend_title_text="Severity",
                     margin=dict(l=20, r=20, t=20, b=20),
                 )
@@ -578,13 +561,8 @@ elif nav == "SQL Workspace":
 
     with col_schema:
         if st.button("Show Schema", use_container_width=False):
-            schema = run_sql(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            )
-            st.info(
-                "Tables:\n"
-                + "\n".join(schema["name"].tolist())
-            )
+            schema = run_sql("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            st.info("Tables:\n" + "\n".join(schema["name"].tolist()))
 
     st.divider()
 
