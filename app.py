@@ -104,21 +104,16 @@ with tab2:
 
 with tab3:
     st.subheader("Geographic Hotspot Map")
-    df = q(f"""
-        SELECT l.latitude,l.longitude,a.severity,a.num_fatalities,l.state
-        FROM accidents a JOIN locations l ON a.location_id=l.location_id
-        WHERE {where}
-    """, tuple(params))
-    if not df.empty:
-        fig = px.scatter_map(df, lat='latitude', lon='longitude', color='severity',
-            size='num_fatalities', size_max=18,
-            color_discrete_map={'Fatal':'red','Serious':'orange','Minor':'green'},
-            zoom=4, height=600)
-        fig.update_layout(map_style="carto-darkmatter",
-            paper_bgcolor='rgb(10,15,25)', font_color='white')
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No data available for selected filters")
+    st.caption("Latitude × Longitude scatter — severity color-coded")
+    df = q(f"""SELECT l.latitude,l.longitude,a.severity,a.num_fatalities,l.state
+               FROM accidents a JOIN locations l ON a.location_id=l.location_id WHERE {where}""", tuple(params))
+    fig = px.scatter(df, x='longitude', y='latitude', color='severity',
+        size='num_fatalities', size_max=25, hover_data=['state'],
+        color_discrete_map={'Fatal':'red','Serious':'orange','Minor':'green'},
+        height=600)
+    fig.update_layout(paper_bgcolor='rgb(10,15,25)', plot_bgcolor='rgb(10,15,25)',
+        font_color='white', xaxis_title="Longitude", yaxis_title="Latitude")
+    st.plotly_chart(fig, use_container_width=True)
 
 with tab4:
     st.subheader("💻 Live SQL Query Runner")
